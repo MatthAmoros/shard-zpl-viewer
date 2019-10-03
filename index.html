@@ -41,6 +41,9 @@ function displayLabel(canvasId, label) {
         let formatedText = text.replace('^FO', '').replace('^FS', '');
         let properties = formatedText.split('^');
         
+        //FX = Comment, continue
+        if(formatedText.indexOf('^FX') >= 0) { console.log(formatedText.replace('^FX', '')); return;}
+        
         //First, postion like : 280, 30
         let position = properties[0].split(',');
         
@@ -53,7 +56,7 @@ function displayLabel(canvasId, label) {
               $("#" + canvasId).barcode(
               textValue,
               getBarcodeTypeFromCode(properties[2]), //Switch according to barcode type
-              {output:'canvas', posX:20, posY:200, showHRI:false}
+              {output:'canvas', posX:position[0], posY:position[1], showHRI:false}
               );
             }
             //Barcode
@@ -62,7 +65,7 @@ function displayLabel(canvasId, label) {
             $("#" + canvasId).barcode(
             textValue,
             getBarcodeTypeFromCode(properties[1]), //Switch according to barcode type
-            {output:'canvas', posX:20, posY:200, showHRI:false}
+            {output:'canvas', posX:position[0], posY:position[1], showHRI:false}
             );
           }
           else {
@@ -83,7 +86,41 @@ function displayLabel(canvasId, label) {
 
 function getBarcodeTypeFromCode(code) {
   let properties = code.split(',');
-  console.log(properties);
+  let codeType = properties[0];
+  
+  switch (codeType[2]) {
+    case 'A':
+      return 'code93';
+      break;
+    case 'B':
+      return 'code128';
+      break;
+    case '1':
+      return 'code11';
+      break;
+    case '2':
+      return 'int25';
+      break;
+    case '3':
+      return 'code39';
+      break;
+    case '4':
+      return 'code49';
+      break;
+    case '8':
+      return 'ean8';
+      break;
+    case '9':
+    case '5':
+    case '6':
+    case '7':
+      return 'code128';
+      break;
+    
+    default:
+      return 'datamatrix';
+      break;
+  }
 }
 
 function getFontFromCode(code) {
