@@ -1,157 +1,230 @@
+<!--
+    @author : Matthieu AMOROS
+    @description : ZPL interpreter
+-->
 
-<input type='text' id='label'/>
+<textarea id="label" placeholder="ZPL Label" rows="20" cols="75">
+</textarea>
+<br />
 <input type="button" onclick="displayLabel('myCanvas', $('#label').val());" value="preview" />
-<canvas id='myCanvas' height="1000" width="1000">
-</canvas>
-<div id='demo'></div>
+<br />
+<canvas id='myCanvas' height="1000" width="1000"></canvas>
 
 <script src="http://code.jquery.com/jquery-latest.min.js"></script>
 <script type="text/javascript" src="jquery-barcode.js"></script>
 <script>
+    /**
+    * [extractRawCommand: Remove leading and trailing command boundaries]
+    * @param  {[string]} command [raw command]
+    * @return {[string]}      [command]
+    */
+    function extractCommand(command) {
+        return command.replace('^FO', '').replace('^FT', '').replace('^FS', '');
+    }
 
-//Init
-var label = '^XA' +
-'^LH0,0^FS' +         
-'^FO280,20^A0N,36,34^CI13^FR^FD DATE: <RECEPTION_DATE>^FS'+
-'^FO280,80^A0N,36,34^CI13^FR^FD <GROWER_GROUP>^FS'+
-'^FO280,110^A0N,36,34^CI13^FR^FD <ORIGIN>^FS'+
-'^FO280,140^A0N,36,34^CI13^FR^FD <DESTINATION>^FS'+
-'^FO280,180^A0N,36,34^CI13^FR^FD FAMILY: <PRODUCT_FAMILY>^FS'+
-'^FO280,210^A0N,36,34^CI13^FR^FD TYPE: <PRODUCT_TYPE>^FS'+
-'^FO280,280^A0N,36,34^CI13^FR^FD PRODUCT: <PRODUCT>^FS'+
-'^FO280,340^A0N,36,34^CI13^FR^FD ID: <ID>^FS'+
-'^FO20,100^BXN,15,200'+
-'^FD<ID>^FS'+
-'^PQ1,0,0,N'+
-'^XZ';
+    /**
+    * [displayLabel: Display label represented by ZPL code on target canvas]
+    * @param  {[string]} canvasId [canvas element id]
+    * @param  {[string]} label [ZPL code]
+    */
+    function displayLabel(canvasId, label) {
+        //Canvas context
+        var c = document.getElementById(canvasId);
+        var ctx = c.getContext("2d");
+        //Clear
+        ctx.clearRect(0, 0, c.width, c.height);
 
-//displayLabel('myCanvas', label);
+        //Get each command
+        var commandLines = label.match(/(\^)(.*)\^FS/g);
+        try {
+            if (commandLines.length > 0) {
+                commandLines.forEach(function (commandLine) {
+                    let formatedText = extractCommand(commandLine);
+                    let properties = formatedText.split('^');
 
-function displayLabel(canvasId, label) {
-  //Init canvas
-  var c = document.getElementById(canvasId);
-  var ctx = c.getContext("2d");
-  
-  //Get each command
-  var textsMatches = label.match(/\^FO([^\r\n]*)\^FS/g);
-  try {
-    if(textsMatches.length > 0) {
-      var texts = textsMatches[0].split('FS');
-      texts.forEach(function (text) {
-        let formatedText = text.replace('^FO', '').replace('^FS', '');
-        let properties = formatedText.split('^');
-        
-        //FX = Comment, continue
-        if(formatedText.indexOf('^FX') >= 0) { console.log(formatedText.replace('^FX', '')); return;}
-        
-        //First, postion like : 280, 30
-        let position = properties[0].split(',');
-        
-        if (properties.length > 2) {
-          if(properties[1].indexOf('B') >= 0) {
-            //Skip barcode options, shift properties index
-            if (properties[1].startsWith("BY") 
-            && properties[2].startsWith("B")) { 
-              let textValue = properties[3].replace('FD', '');
-              $("#" + canvasId).barcode(
-              textValue,
-              getBarcodeTypeFromCode(properties[2]), //Switch according to barcode type
-              {output:'canvas', posX:position[0], posY:position[1], showHRI:false}
-              );
+                    //FX = Comment, continue
+                    if (formatedText.indexOf('^FX') >= 0) { console.log(formatedText.replace('^FX', '')); return; }
+
+                    //First, postion like : 280, 30
+                    let position = properties[0].split(',');
+
+                    if (properties.length > 2) {
+                        if (properties[1].startsWith("B")) {
+                            //Skip barcode options, shift properties index
+                            if (properties[1].startsWith("BY")
+                                && properties[2].startsWith("B")) {
+                                let textValue = properties[3].replace('FD', '');
+                                $("#" + canvasId).barcode(
+                                    textValue,
+                                    getBarcodeTypeFromCode(properties[2]), //Switch according to barcode type
+                                    { output: 'canvas', posX: position[0], posY: position[1], showHRI: false }
+                                );
+                            }
+                            //Barcode
+                            // https://barcode-coder.com/en/barcode-jquery-plugin-201.html
+                            let textValue = properties[2].replace('FD', '');
+                            $("#" + canvasId).barcode(
+                                textValue,
+                                getBarcodeTypeFromCode(properties[1]), //Switch according to barcode type
+                                { output: 'canvas', posX: position[0], posY: position[1], showHRI: false }
+                            );
+                        }
+                        else {
+                            //Text
+                            ctx.font = getFontFromCode(properties[1]);
+                            let textValue = getTextValueFronProperties(properties);
+                            ctx.fillText(textValue, position[0], position[1]);
+                        }
+                    }
+                    else {
+                        //Box
+                        if (properties[1].startsWith("GB")) {
+                            drawBox(position, properties[1].replace('GB', ''), ctx);
+                        }
+                    }
+                });
             }
-            //Barcode
-            // https://barcode-coder.com/en/barcode-jquery-plugin-201.html
-            let textValue = properties[2].replace('FD', '');
-            $("#" + canvasId).barcode(
-            textValue,
-            getBarcodeTypeFromCode(properties[1]), //Switch according to barcode type
-            {output:'canvas', posX:position[0], posY:position[1], showHRI:false}
-            );
-          }
-          else {
-            //Text
-            ctx.font = getFontFromCode(properties[1]);
-            let textValue = getTextValueFronProperties(properties);
-            ctx.fillText(textValue, position[0], position[1]);
-          }
         }
-      });
-      
+        catch (error) {
+            console.error(error);
+        }
     }
-  }
-  catch(error) {
-    console.error(error);
-  }
-}
 
-function getBarcodeTypeFromCode(code) {
-  let properties = code.split(',');
-  let codeType = properties[0];
-  
-  switch (codeType[2]) {
-    case 'A':
-      return 'code93';
-      break;
-    case 'B':
-      return 'code128';
-      break;
-    case '1':
-      return 'code11';
-      break;
-    case '2':
-      return 'int25';
-      break;
-    case '3':
-      return 'code39';
-      break;
-    case '4':
-      return 'code49';
-      break;
-    case '8':
-      return 'ean8';
-      break;
-    case '9':
-    case '5':
-    case '6':
-    case '7':
-      return 'code128';
-      break;
-    
-    default:
-      return 'datamatrix';
-      break;
-  }
-}
+    /**
+    * [drawBox: Draw box according to ZPL parameters]
+    * @param  {[string]} position [position string]
+    * @param  {[string]} parameters [parameters string, separated with coma]
+    * @param  {[object]} ctx [canvas context]
+    */
+    function drawBox(position, parameters, ctx) {
+        //parameter = 0,347,7
+        //Default values
+        var width, height, thickness = 1;
+        var color = 'B';
+        var cornerRounding = 0;
+        var x, y = 0;
 
-function getFontFromCode(code) {
-  let fontName = 'Courrier Sans MS'
-  let fontSize = 'px'
-  
-  properties = code.split(',');
-  
-  switch (properties[0]) {
-    case 'A0N':
-      fontName = 'Courrier Sans MS'
-      break;
-    
-    default:
-      break;
-  }
-  
-  fontSize = properties[1] + fontSize;
-  
-  return fontSize + ' ' + fontName;
-}
+        var splitted = parameters.split(',');
 
-function getTextValueFronProperties(properties) {
-  var textValue = ""
-  properties.forEach(function(property) {
-    if(property.indexOf('FD') >= 0) {
-      textValue = property.replace('FD', '');
+        for (var i in splitted) {
+            switch (i) {
+                case '0':
+                    width = parseInt(splitted[i]);
+                    break;
+
+                case '1':
+                    height = parseInt(splitted[i]);
+                    break;
+
+                case '2':
+                    thickness = parseInt(splitted[i]);
+                    break;
+
+                case '3':
+                    color = splitted[i];
+                    break;
+
+                case '4':
+                    cornerRounding = parseInt(splitted[i]);
+                    break;
+
+                default:
+                    break;
+            }
+        }
+
+        x = parseInt(position[0]);
+        y = parseInt(position[1]);
+        ctx.lineWidth = thickness;
+        ctx.strokeStyle = "black";
+        ctx.rect(x, y, width, height);
+        ctx.stroke();
     }
-  });
-  
-  return textValue;
-}
+
+    /**
+    * [getBarcodeTypeFromCode: Get barcode type from ZPL code]
+    * @param  {[string]} code [ZPL code]
+    * @return {[string]} [barcode type]
+    */
+    function getBarcodeTypeFromCode(code) {
+        let properties = code.split(',');
+        let codeType = properties[0];
+
+        switch (codeType[2]) {
+            case 'A':
+                return 'code93';
+                break;
+            case 'B':
+            case 'R':
+                return 'code128';
+                break;
+            case '1':
+                return 'code11';
+                break;
+            case '2':
+                return 'int25';
+                break;
+            case '3':
+                return 'code39';
+                break;
+            case '4':
+                return 'code49';
+                break;
+            case '8':
+                return 'ean8';
+                break;
+            case '9':
+            case '5':
+            case '6':
+            case '7':
+                return 'code128';
+                break;
+
+            default:
+                return 'datamatrix';
+                break;
+        }
+    }
+
+    /**
+    * [getFontFromCode: Get font type from ZPL code]
+    * @param  {[string]} code [ZPL code]
+    * @return {[string]} [font type]
+    */
+    function getFontFromCode(code) {
+        let fontName = 'Courrier Sans MS'
+        let fontSize = 'px'
+
+        properties = code.split(',');
+
+        switch (properties[0]) {
+            case 'A0N':
+                fontName = 'Courrier Sans MS'
+                break;
+
+            default:
+                break;
+        }
+
+        fontSize = properties[1] + fontSize;
+
+        return fontSize + ' ' + fontName;
+    }
+
+    /**
+    * [getTextValueFronProperties: Get text value from ZPL properties]
+    * @param  {[string]} properties [ZPL code]
+    * @return {[string]} [text value]
+    */
+    function getTextValueFronProperties(properties) {
+        var textValue = ""
+        properties.forEach(function (property) {
+            if (property.indexOf('FD') >= 0) {
+                textValue = property.replace('FD', '');
+            }
+        });
+
+        return textValue;
+    }
 
 </script>
