@@ -33,9 +33,10 @@
         var ctx = c.getContext("2d");
         //Clear
         ctx.clearRect(0, 0, c.width, c.height);
+        ctx.save();
 
         //Get each command
-        var commandLines = label.match(/(\^)(.*)\^FS/g);
+        var commandLines = label.match(/(\^)(.*)\^/g);
         try {
             if (commandLines.length > 0) {
                 commandLines.forEach(function (commandLine) {
@@ -48,46 +49,81 @@
                     //First, postion like : 280, 30
                     let position = properties[0].split(',');
 
-                    if (properties.length > 2) {
-                        if (properties[1].startsWith("B")) {
-                            //Skip barcode options, shift properties index
-                            if (properties[1].startsWith("BY")
-                                && properties[2].startsWith("B")) {
-                                let textValue = properties[3].replace('FD', '');
-                                $("#" + canvasId).barcode(
-                                    textValue,
-                                    getBarcodeTypeFromCode(properties[2]), //Switch according to barcode type
-                                    { output: 'canvas', posX: position[0], posY: position[1], showHRI: false }
-                                );
-                            }
-                            //Barcode
-                            // https://barcode-coder.com/en/barcode-jquery-plugin-201.html
-                            let textValue = properties[2].replace('FD', '');
+                    if (properties[1].startsWith("B")) {
+                        //Barcode
+                        //Skip barcode options, shift properties index
+                        if (properties[1].startsWith("BY")
+                            && properties[2].startsWith("B")) {
+                            let textValue = properties[3].replace('FD', '');
                             $("#" + canvasId).barcode(
                                 textValue,
-                                getBarcodeTypeFromCode(properties[1]), //Switch according to barcode type
+                                getBarcodeTypeFromCode(properties[2]), //Switch according to barcode type
                                 { output: 'canvas', posX: position[0], posY: position[1], showHRI: false }
                             );
                         }
-                        else {
-                            //Text
-                            ctx.font = getFontFromCode(properties[1]);
-                            let textValue = getTextValueFronProperties(properties);
-                            ctx.fillText(textValue, position[0], position[1]);
-                        }
+                        //Barcode list
+                        // https://barcode-coder.com/en/barcode-jquery-plugin-201.html
+                        let textValue = properties[2].replace('FD', '');
+                        $("#" + canvasId).barcode(
+                            textValue,
+                            getBarcodeTypeFromCode(properties[1]), //Switch according to barcode type
+                            { output: 'canvas', posX: position[0], posY: position[1], showHRI: false }
+                        );
+                    }
+                    else if (properties[1].startsWith("GB")) {
+                        //Box
+                        drawBox(position, properties[1].replace('GB', ''), ctx);
                     }
                     else {
-                        //Box
-                        if (properties[1].startsWith("GB")) {
-                            drawBox(position, properties[1].replace('GB', ''), ctx);
-                        }
+                        //Text & font
+                        let textValue = getTextValueFronProperties(properties);
+                        ctx.font = getFontFromCode(properties[1]);
+
+                        //Rotate
+                        let rads = getRotationFromCode(properties[1]);
+                        ctx.rotate(rads);
+                        //Re-calculate position according to rotation
+                        let x, y, xRot, yRot = 0;
+                        x = parseInt(position[0]);
+                        y = parseInt(position[1]);
+                        xRot = y * Math.sin(rads) + x * Math.cos(rads)
+                        yRot = y * Math.cos(rads) - x * Math.sin(rads)
+
+                        ctx.fillText(textValue, xRot, yRot);
+                        console.log("[" + xRot + "," + yRot + ":" + rads + "] " + textValue);
                     }
+
+                    //Reset transform
+                    ctx.restore();
                 });
             }
         }
         catch (error) {
             console.error(error);
         }
+    }
+
+    function getRotationFromCode(property) {
+        //"A@N,23,22,TT0003M_"
+        let angle;
+        switch (property[2]) {
+            case "N":
+                angle = 0;
+                break;
+            case "R":
+                angle = 90;
+                break;
+            case "I":
+                angle = 180;
+                break;
+            case "B":
+                angle = 270;
+                break;
+            default:
+                angle = 0;
+                break;
+        }
+        return (Math.PI / 180) * angle;
     }
 
     /**
@@ -196,9 +232,10 @@
         let fontSize = 'px'
 
         properties = code.split(',');
+        let fontCode = properties[0].substring(0, 2);
 
-        switch (properties[0]) {
-            case 'A0N':
+        switch (fontCode) {
+            case 'A0':
                 fontName = 'Courrier Sans MS'
                 break;
 
