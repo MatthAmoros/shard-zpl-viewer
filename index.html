@@ -13,14 +13,27 @@
 <script src="http://code.jquery.com/jquery-latest.min.js"></script>
 <script type="text/javascript" src="jquery-barcode.js"></script>
 <script>
-    /**
-    * [extractRawCommand: Remove leading and trailing command boundaries]
-    * @param  {[string]} command [raw command]
-    * @return {[string]}      [command]
-    */
-    function extractCommand(command) {
-        return command.replace('^FO', '').replace('^FT', '').replace('^FS', '');
-    }
+	function getPositionFromCommand(command) {
+		const regex = /((\^FT)|(\^FO))(.[0-9,]*)\^/;
+		let results = regex.exec(command);
+		//Second result is position
+		if(results != null && results.length >= 2)		
+			return results[results.length - 1].split(',');
+		else
+			//Not found
+			return "NA,NA".split(',');
+	}
+	
+	function getTextValueFromCommand(command) {
+		const regex = /\^FD(.*)\^FS/u;
+		let results = regex.exec(command);
+		//Second result is position
+		if(results != null)		
+			return results[1];
+		else
+			//Not found
+			return "";
+	}
 
     /**
     * [displayLabel: Display label represented by ZPL code on target canvas]
@@ -31,76 +44,125 @@
         //Canvas context
         var c = document.getElementById(canvasId);
         var ctx = c.getContext("2d");
+		
         //Clear
+		ctx.restore();
         ctx.clearRect(0, 0, c.width, c.height);
         ctx.save();
 
+		let currentPosition = "0,0".split(',');
+
         //Get each command
-        var commandLines = label.match(/(\^)(.*)\^/g);
+        var commandLines = label.match(/\^(.*)\^FS/mg);
         try {
             if (commandLines.length > 0) {
                 commandLines.forEach(function (commandLine) {
-                    let formatedText = extractCommand(commandLine);
+                    let formatedText = commandLine;
                     let properties = formatedText.split('^');
+					let rads = 0;
+					let position = "0,0".split(',');
 
+                    //Get position
+					let newPosition = getPositionFromCommand(commandLine);
+					if(isNaN(newPosition[0]) || isNaN(newPosition[1]))
+					{
+						console.log("No position found, keep current one.");
+						position = currentPosition;
+					}
+					else
+					{
+						currentPosition = newPosition;
+						position = currentPosition;
+					}
+                    
+					//Get text value
+                    let textValue = getTextValueFromCommand(commandLine);		
+					
                     //FX = Comment, continue
-                    if (formatedText.indexOf('^FX') >= 0) { console.log(formatedText.replace('^FX', '')); return; }
+                    if (formatedText.indexOf('^FX') >= 0 || isNaN(position[0]) || isNaN(position[1])) { 
+						console.log("Not displayed : " + formatedText.replace('^FX', '')); return; 
+					}
 
-                    //First, postion like : 280, 30
-                    let position = properties[0].split(',');
+                    if (properties[2].startsWith("B")) {					
+						//Rotate
+						rads = getRotationFromCode(properties[3]);
+						//Re-calculate position according to rotation
+						let x, y = 0;
+						x = parseInt(position[0]);
+						y = parseInt(position[1]);
+						
+						if (rads > 0) {
+							//Translate to object position to apply rotation
+							ctx.translate(x , y);
+							ctx.rotate(rads);
+							//Already on point, relative coordinate are 0
+							x = 0;
+							y = 0;
+						}
 
-                    if (properties[1].startsWith("B")) {
                         //Barcode
                         //Skip barcode options, shift properties index
-                        if (properties[1].startsWith("BY")
-                            && properties[2].startsWith("B")) {
-                            let textValue = properties[3].replace('FD', '');
+                        if (properties[2].startsWith("BY")
+                            && properties[3].startsWith("B")) {
                             $("#" + canvasId).barcode(
                                 textValue,
-                                getBarcodeTypeFromCode(properties[2]), //Switch according to barcode type
-                                { output: 'canvas', posX: position[0], posY: position[1], showHRI: false }
+                                getBarcodeTypeFromCode(properties[3]), //Switch according to barcode type
+                                { output: 'canvas', posX: x, posY: y, showHRI: false }
                             );
+							console.log("[" + x + "," + y + ":" + rads + "|BARCODE " + getBarcodeTypeFromCode(properties[3]) +"] " + textValue);
                         }
-                        //Barcode list
-                        // https://barcode-coder.com/en/barcode-jquery-plugin-201.html
-                        let textValue = properties[2].replace('FD', '');
-                        $("#" + canvasId).barcode(
-                            textValue,
-                            getBarcodeTypeFromCode(properties[1]), //Switch according to barcode type
-                            { output: 'canvas', posX: position[0], posY: position[1], showHRI: false }
-                        );
+						else
+						{
+	                        //Barcode list
+	                        // https://barcode-coder.com/en/barcode-jquery-plugin-201.html
+	                        let textValue = properties[3].replace('FD', '');
+	                        $("#" + canvasId).barcode(
+	                            textValue,
+	                            getBarcodeTypeFromCode(properties[2]), //Switch according to barcode type
+	                            { output: 'canvas', posX: x, posY: y, showHRI: true }
+	                        );
+						}
                     }
-                    else if (properties[1].startsWith("GB")) {
+                    else if (properties[2].startsWith("GB")) {
                         //Box
-                        drawBox(position, properties[1].replace('GB', ''), ctx);
+                        drawBox(position, properties[2].replace('GB', ''), ctx);
                     }
                     else {
                         //Text & font
-                        let textValue = getTextValueFronProperties(properties);
-                        ctx.font = getFontFromCode(properties[1]);
+                        ctx.font = getFontFromCode(properties[2]);
 
                         //Rotate
-                        let rads = getRotationFromCode(properties[1]);
-                        ctx.rotate(rads);
+                        rads = getRotationFromCode(properties[2]);
+						
                         //Re-calculate position according to rotation
-                        let x, y, xRot, yRot = 0;
+                        let x, y = 0;
                         x = parseInt(position[0]);
                         y = parseInt(position[1]);
-                        xRot = y * Math.sin(rads) + x * Math.cos(rads)
-                        yRot = y * Math.cos(rads) - x * Math.sin(rads)
-
-                        ctx.fillText(textValue, xRot, yRot);
-                        console.log("[" + xRot + "," + yRot + ":" + rads + "] " + textValue);
+						
+						if (rads > 0) {
+							//Translate to object position to apply rotation
+							ctx.translate(x , y);
+							ctx.rotate(rads);
+							//Already on point, relative coordinate are 0
+							x = 0;
+							y = 0;
+						}
+						
+                        ctx.fillText(textValue, x, y);
+                        console.log("[" + x + "," + y + ":" + rads + "|" + ctx.font + "] " + textValue);
                     }
 
-                    //Reset transform
-                    ctx.restore();
+					//Reset transform
+					ctx.resetTransform();
                 });
             }
         }
         catch (error) {
             console.error(error);
         }
+		finally {
+			ctx.restore();
+		}
     }
 
     function getRotationFromCode(property) {
@@ -242,8 +304,12 @@
             default:
                 break;
         }
-
-        fontSize = properties[1] + fontSize;
+			
+		if (parseInt(properties[1]) <= 60)
+        	fontSize = properties[1] + fontSize;
+		else
+			//Limit
+			fontSize = '24px';
 
         return fontSize + ' ' + fontName;
     }
