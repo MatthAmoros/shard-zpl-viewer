@@ -102,7 +102,6 @@
 						rads = getRotationFromCode(properties[3]);
 						
 						let barCodeType = getBarcodeTypeFromCode(commandLine);
-						var options = buildBarCodeOptions(commandLine, barCodeType, x, y, false, textValue);
 						let layerId = createNewLayer(currentLayer);
 					
 						if (rads > 0) {
@@ -114,8 +113,9 @@
 							//Already on point, relative coordinate are 0
 							x = 0;					
 							y = 0;					
-						}
-						
+						}						
+
+						var options = buildBarCodeOptions(commandLine, barCodeType, x, y, false, textValue);
 
 						//https://barcode-coder.com/en/barcode-jquery-plugin-201.html
                         $("#" + layerId).barcode(
@@ -176,16 +176,15 @@
 		var canvas = document.createElement('canvas');
         var div = document.getElementById('drawingArea'); 
 		
-        canvas.id     = canvasId;
-		canvas.class = "layer";
-        canvas.width  = 1000;
-        canvas.height = 500;
+        canvas.id = canvasId;
+		//Copy main canvas
+        canvas.width = c.width;
+        canvas.height = c.height;
         canvas.style.position = "absolute";
 		canvas.style.left = 0;
 		canvas.style.top = 0;
         canvas.style.zIndex = layer;
-		canvas.style.border = "1px solid";
-		
+
         div.appendChild(canvas)
 		
 		return canvasId;
