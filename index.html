@@ -2,17 +2,31 @@
     @author : Matthieu AMOROS
     @description : ZPL interpreter
 -->
+<!DOCTYPE html>
 
-<textarea id="label" placeholder="ZPL Label" rows="20" cols="75">
-</textarea>
-<br />
-<input type="button" onclick="displayLabel('myCanvas', $('#label').val());" value="preview" />
-<br />
-<canvas id='myCanvas' height="2000" width="1000"></canvas>
+<div id="drawingArea" height="500" width="1000" style="margin-left: 10%;">
+	<canvas id='mainCanvas' height="500" width="1000" style="z-index: 1; position: absolute; left: 0; top: 0;"></canvas>
+</div>
 
+<div style="top:80%; position: absolute">
+	<textarea id="label" placeholder="ZPL Label" rows="20" cols="75">
+	</textarea>
+	<br />
+	<input type="button" onclick="displayLabel('myCanvas', $('#label').val());" value="preview" />
+	<br />
+</div>
 <script src="http://code.jquery.com/jquery-latest.min.js"></script>
 <script type="text/javascript" src="jquery-barcode.js"></script>
 <script>
+
+	//Declare context and save a blank state
+	var c = document.getElementById('mainCanvas');
+    var ctx = c.getContext("2d");
+	
+    //Clear
+    ctx.clearRect(0, 0, c.width, c.height);
+    ctx.save();
+	
 	function getPositionFromCommand(command) {
 		const regex = /((\^FT)|(\^FO))(.[0-9,]*)\^/;
 		let results = regex.exec(command);
@@ -41,16 +55,12 @@
     * @param  {[string]} label [ZPL code]
     */
     function displayLabel(canvasId, label) {
-        //Canvas context
-        var c = document.getElementById(canvasId);
-        var ctx = c.getContext("2d");
-		
         //Clear
-		ctx.restore();
         ctx.clearRect(0, 0, c.width, c.height);
-        ctx.save();
+		clearLayers();
 
 		let currentPosition = "0,0".split(',');
+		let currentLayer = 1;
 		
         //Get each command
         var commandLines = label.match(/\^(.*)\^FS/mg);
@@ -91,23 +101,30 @@
 						//Rotate
 						rads = getRotationFromCode(properties[3]);
 						
+						let barCodeType = getBarcodeTypeFromCode(commandLine);
+						var options = buildBarCodeOptions(commandLine, barCodeType, x, y, false, textValue);
+						let layerId = createNewLayer(currentLayer);
+					
 						if (rads > 0) {
 							//Translate to object position to apply rotation
-							ctx.translate(x , y);
-							ctx.rotate(rads);
+							var layer = document.getElementById(layerId);
+    						var ctx_layer = layer.getContext("2d");
+							ctx_layer.translate(x , y);
+							ctx_layer.rotate(rads);
 							//Already on point, relative coordinate are 0
-							x = 0;
-							y = 0;
+							x = 0;					
+							y = 0;					
 						}
+						
 
-                        $("#" + canvasId).barcode(
+						//https://barcode-coder.com/en/barcode-jquery-plugin-201.html
+                        $("#" + layerId).barcode(
                             textValue,
-                            getBarcodeTypeFromCode(commandLine),
-							//getBarcodeParameters(commandLine), //Switch according to barcode type
-                            { output: 'canvas', posX: x, posY: y, showHRI: true }
+                            barCodeType,
+                            options
                         );
-						console.log("[" + x + "," + y + ":" + rads + "|BARCODE " + getBarcodeTypeFromCode(commandLine) +"] " + textValue);
-                        
+						
+						console.log("[" + x + "," + y + ":" + rads + "|BARCODE " + getBarcodeTypeFromCode(commandLine) +"] " + textValue);                        
                     }					
                     else if (properties[2].startsWith("GB")) {
                         //Box
@@ -146,27 +163,82 @@
 		}
     }
 	
+	function clearLayers() {
+		var i;
+		for (i = 0; i < 10; i++) {
+		  $("#layer" + i).remove();
+		}
+	}
+	
+	function createNewLayer(currentLayer) {
+		var layer = currentLayer + 1;
+		var canvasId = 'layer' + layer;
+		var canvas = document.createElement('canvas');
+        var div = document.getElementById('drawingArea'); 
+		
+        canvas.id     = canvasId;
+		canvas.class = "layer";
+        canvas.width  = 1000;
+        canvas.height = 500;
+        canvas.style.position = "absolute";
+		canvas.style.left = 0;
+		canvas.style.top = 0;
+        canvas.style.zIndex = layer;
+		canvas.style.border = "1px solid";
+		
+        div.appendChild(canvas)
+		
+		return canvasId;
+	}
+	
 	function containsBarCodeDefinition(commandLine) {
 		//Should match ^BCo,h,f,g,e,m
-		const regex = /\^B.([A0-Z9,]{6,})\^/;
+		const regex = /\^B[^Y]([A0-Z9,]{6,})\^/;
 		let results = regex.exec(commandLine);
 		return (results != null);
 	}
 	
-	function getBarcodeParameters(commandLine) {
+	function buildBarCodeOptions(commandLine, type, x, y, HRI, textValue) {
 		//Should match ^B.o,h,f,g,e,m
-		const regex = /\^B.([A0-Z9,]{6,})\^/;
+		const regex = /\^B[^Y]([A0-Z9,]{6,})\^/;
 		let results = regex.exec(commandLine);
 		//Second result is position
 		if(results != null){
 			let barcodeParameters = results[1].split(',');
-			if(barcodeParameters.length == 5) {
-				let orientation = barcodeParameters[0];
-				let barCodeHeight = barcodeParameters[1];
-				let printInterpretationLine = barcodeParameters[2];
-				let printInterpretationLineAboveCode = barcodeParameters[3];
-				let uccCheckDigit = barcodeParameters[4];
-				return {barHeight: parseInt(barCodeHeight)};
+			if(barcodeParameters.length >= 5) {
+
+				if(type == "datamatrix") {
+					//Assume encoding is ASCII mode, 1 character = 8 tiles, 2 module height			
+					let approxCodeSize = 0;
+
+					let orientation = barcodeParameters[0];
+					let moduleSize = parseInt(barcodeParameters[1]);
+					let eccValue = barcodeParameters[2];
+					let printInterpretationLineAboveCode = barcodeParameters[3];
+					let uccCheckDigit = barcodeParameters[4];
+					
+					if(eccValue == "200")
+					{
+						//Very naive size, from 9x9 to 49x49
+						approxCodeSize = (textValue.length < 9 ? 9 : (textValue.length > 49 ? 49 : textValue.length));
+					}
+					else
+					{
+						//Very naive size, from 10x10 to 144x144
+						approxCodeSize = (textValue.length < 10 ? 10 : (textValue.length > 144 ? 144 : textValue.length));
+					}
+						
+					return {output: 'canvas', moduleSize: moduleSize, posX: x, posY: y- (moduleSize * approxCodeSize * 2), showHRI: HRI};
+				}
+				else
+				{
+					let orientation = barcodeParameters[0];
+					let barCodeHeight = parseInt(barcodeParameters[1]);
+					let printInterpretationLine = barcodeParameters[2];
+					let printInterpretationLineAboveCode = barcodeParameters[3];
+					let uccCheckDigit = barcodeParameters[4];
+					return {output: 'canvas', barHeight: barCodeHeight, posX: x, posY: y, showHRI: HRI};
+				}
 			}
 			else
 				return {};
@@ -176,7 +248,7 @@
 			//Not found
 			return {};
 	}
-
+	
     function getRotationFromCode(property) {
         //"A@N,23,22,TT0003M_"
         let angle;
