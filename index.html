@@ -15,6 +15,7 @@
 	<input type="button" onclick="displayLabel('myCanvas', $('#label').val());" value="preview" />
 	<br />
 </div>
+
 <script src="http://code.jquery.com/jquery-latest.min.js"></script>
 <script type="text/javascript" src="jquery-barcode.js"></script>
 <script>
@@ -27,6 +28,11 @@
     ctx.clearRect(0, 0, c.width, c.height);
     ctx.save();
 	
+	/**
+    * [getPositionFromCommand: Extract field position (x,y) from ZPL command]
+    * @param  {[string]} command [ZPL code]
+    * @return  {[string]} position [as x,y]
+    */
 	function getPositionFromCommand(command) {
 		const regex = /((\^FT)|(\^FO))(.[0-9,]*)\^/;
 		let results = regex.exec(command);
@@ -38,6 +44,11 @@
 			return "NA,NA".split(',');
 	}
 	
+	/**
+    * [getTextValueFromCommand: Extract text field value from ZPL command]
+    * @param  {[string]} command [ZPL code]
+    * @return  {[string]} text [text field value]
+    */
 	function getTextValueFromCommand(command) {
 		const regex = /\^FD(.*)\^FS/u;
 		let results = regex.exec(command);
@@ -163,6 +174,9 @@
 		}
     }
 	
+	/**
+    * [clearLayers: Clear all layers]
+    */
 	function clearLayers() {
 		var i;
 		for (i = 0; i < 10; i++) {
@@ -170,6 +184,11 @@
 		}
 	}
 	
+	/**
+    * [createNewLayer: Create a new layer with next z index]
+    * @param  {[int]} currentLayer [Layer index (z index)]
+    * @return {[string]} [canvasId]
+    */
 	function createNewLayer(currentLayer) {
 		var layer = currentLayer + 1;
 		var canvasId = 'layer' + layer;
@@ -190,6 +209,11 @@
 		return canvasId;
 	}
 	
+	/**
+    * [containsBarCodeDefinition: True if commandline contains barcode definition]
+    * @param  {[string]} commandLine [ZPL code]
+    * @return {[bool]} [result]
+    */
 	function containsBarCodeDefinition(commandLine) {
 		//Should match ^BCo,h,f,g,e,m
 		const regex = /\^B[^Y]([A0-Z9,]{6,})\^/;
@@ -197,6 +221,16 @@
 		return (results != null);
 	}
 	
+	/**
+    * [buildBarCodeOptions: Build barcode from position and parameters]
+    * @param  {[string]} commandLine [ZPL code]
+	* @param  {[string]} type [barcode type]
+	* @param  {[int]} x [x position]
+	* @param  {[int]} y [y position]
+	* @param  {[bool]} HRI [Human readable text]
+	* @param  {[string]} textValue [Text value]
+    * @return {[object]} [options]
+    */
 	function buildBarCodeOptions(commandLine, type, x, y, HRI, textValue) {
 		//Should match ^B.o,h,f,g,e,m
 		const regex = /\^B[^Y]([A0-Z9,]{6,})\^/;
@@ -240,14 +274,18 @@
 				}
 			}
 			else
-				return {};
-			
+				return {};			
 		}
 		else
 			//Not found
 			return {};
 	}
 	
+	/**
+    * [getRotationFromCode: Get rotation from code]
+    * @param  {[string]} property [ZPL code]
+    * @return {[string]} [rads]
+    */
     function getRotationFromCode(property) {
         //"A@N,23,22,TT0003M_"
         let angle;
@@ -425,5 +463,4 @@
 
         return textValue;
     }
-
 </script>
