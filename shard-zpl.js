@@ -3,6 +3,10 @@
  *   @description : ZPL interpreter
  */
     //Declare context and save a blank state
+	/*
+	var g_replacementValues = [];
+	g_replacementValues["<ID>"] = "000001";
+	*/
     var c = document.getElementById('mainCanvas');
     var ctx = c.getContext("2d");
 	
@@ -46,8 +50,9 @@
     * [displayLabel: Display label represented by ZPL code on target canvas]
     * @param  {[string]} canvasId [canvas element id]
     * @param  {[string]} label [ZPL code]
+    * @param  {[string]} replacementValues [Dictionnary of ZPL token and value]
     */
-    function displayLabel(canvasId, label) {
+    function displayLabel(canvasId, label, replacementValues) {
         //Clear
         ctx.clearRect(0, 0, c.width, c.height);
 		clearLayers();
@@ -83,7 +88,8 @@
 					y = parseInt(position[1]);
                     
 					//Get text value
-                    let textValue = getTextValueFromCommand(commandLine);		
+                    let textValue = getTextValueFromCommand(commandLine);
+		    		textValue = checkForReplacement(textValue, 	replacementValues);	
 					
                     //FX = Comment, continue
                     if (formatedText.indexOf('^FX') >= 0 || isNaN(position[0]) || isNaN(position[1])) { 
@@ -155,6 +161,20 @@
 			ctx.restore();
 		}
     }
+	
+	/**
+    * [checkForReplacement: Check if value must be replaced]
+    * @param  {[string]} token [ZPL token]
+	* @param  {[Dictionnary]} replacementValues [Dictionnary<string,string>]
+    * @return {[string]} [canvasId]
+    */
+	function checkForReplacement(token, replacementValues) {
+		let trimmedToken = token.trim();
+		if(replacementValues != null && trimmedToken in replacementValues)
+			return replacementValues[trimmedToken];
+		else
+			return token;
+	}
 	
 	/**
     * [clearLayers: Clear all layers]
