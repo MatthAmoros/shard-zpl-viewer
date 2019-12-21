@@ -201,9 +201,9 @@
 		//Copy main canvas
         canvas.width = c.width;
         canvas.height = c.height;
-        canvas.style.position = "absolute";
-		canvas.style.left = 0;
-		canvas.style.top = 0;
+        canvas.style.position = c.style.position;
+		canvas.style.left = c.style.left;
+		canvas.style.top = c.style.top;
         canvas.style.zIndex = layer;
 
         div.appendChild(canvas)
