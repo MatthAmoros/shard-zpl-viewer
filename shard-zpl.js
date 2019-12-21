@@ -61,7 +61,7 @@
 		let currentLayer = 1;
 		
         //Get each command
-        var commandLines = label.match(/\^(.*)\^FS/mg);
+        var commandLines = label.match(/\^(.*?)FS/g);
         try {
             if (commandLines.length > 0) {
                 commandLines.forEach(function (commandLine) {
