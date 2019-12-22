@@ -164,13 +164,31 @@ function displayLabel(canvasId, label, replacementValues, scale) {
 }
 
 function fitDestinationElement(scale) {
+	var newLeftPosition = '';
+	var newTopPosition = '';
 	$('canvas').each(function() {
 		let canvas = $(this)[0];
+		let canvasLeft = canvas.width;
+		let canvasTop = canvas.height;
 		canvas.style.transform = "scale("
 		+ scale
 		+ ","
 		+ scale
 		+ ")"
+
+		if(scale < 1) {
+			newLeftPosition = (canvasLeft / 2 * -1 * scale).toString() + "px";
+			newTopPosition = (canvasTop / 2 * -1 * scale).toString() + "px";
+		}
+		else {
+			newLeftPosition = (canvasLeft / 2 * scale).toString() + "px";
+			newTopPosition = (canvasTop / 2 * scale).toString() + "px";
+		}		
+
+		let element = document.getElementById(canvas.id);
+		element.style.left = newLeftPosition;
+		element.style.top = newTopPosition;
+//		element.style.position = "absolute";
 	});
 }
 
