@@ -110,8 +110,7 @@ function displayLabel(canvasId, label, replacementValues, scale) {
 						ctx_layer.translate(x , y);
 						ctx_layer.rotate(rads);
 						//Already on point, relative coordinate are 0
-						//Barcode is alway at the middle
-						x = -1 * layer.height / 2.5;
+						x = 0;
 						y = 0;
 					}
 
@@ -473,10 +472,7 @@ function getFontFromCode(code) {
 	}
 
 	if (parseInt(properties[1]) <= 60)
-	fontSize = properties[1] + fontSize;
-	else
-	//Limit
-	fontSize = '24px';
+		fontSize = properties[1] + fontSize;
 
 	return fontSize + ' ' + fontName;
 }
