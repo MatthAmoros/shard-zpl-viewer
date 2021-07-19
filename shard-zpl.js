@@ -101,7 +101,7 @@ function displayLabel(canvasId, label, replacementValues, scale) {
 					rads = getRotationFromCode(properties[3]);
 
 					let barCodeType = getBarcodeTypeFromCode(commandLine);
-					let layerId = createNewLayer(currentLayer);
+					let layerId = createNewLayer(currentLayer, x, y);
 
 					if (rads > 0) {
 						//Translate to object position to apply rotation
@@ -110,7 +110,8 @@ function displayLabel(canvasId, label, replacementValues, scale) {
 						ctx_layer.translate(x , y);
 						ctx_layer.rotate(rads);
 						//Already on point, relative coordinate are 0
-						x = 0;
+						//Barcode is alway at the middle
+						x = -1 * layer.height / 2.5;
 						y = 0;
 					}
 
@@ -188,7 +189,6 @@ function fitDestinationElement(scale) {
 		let element = document.getElementById(canvas.id);
 		element.style.left = newLeftPosition;
 		element.style.top = newTopPosition;
-//		element.style.position = "absolute";
 	});
 }
 
@@ -221,7 +221,7 @@ function clearLayers() {
 * @param  {[int]} currentLayer [Layer index (z index)]
 * @return {[string]} [canvasId]
 */
-function createNewLayer(currentLayer) {
+function createNewLayer(currentLayer, x, y) {
 	var layer = currentLayer + 1;
 	var canvasId = 'layer' + layer;
 	var canvas = document.createElement('canvas');
@@ -231,9 +231,10 @@ function createNewLayer(currentLayer) {
 	//Copy main canvas
 	canvas.width = c.width;
 	canvas.height = c.height;
-	canvas.style.position = c.style.position;
-	canvas.style.left = c.style.left;
-	canvas.style.top = c.style.top;
+	//Absolute for next layer
+	canvas.style.position = 'absolute';
+	canvas.style.left = x + "px";
+	canvas.style.top = y + "px";
 	canvas.style.zIndex = layer;
 
 	div.appendChild(canvas)
